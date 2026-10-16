@@ -122,6 +122,7 @@ npm run deploy     # ビルドして Cloudflare Workers へ公開
 - URL: https://game.chozo.net/umpire/ （Cloudflare Workers + Static Assets、Worker名 `umpire`、ゾーン `chozo.net`。workers.dev は使わない）
 - GitHub: https://github.com/chozo/umpire
 - ビルドの出力先は `dist/umpire/`（`wrangler.jsonc` の `assets.directory` は `./dist`）
+- 2026-10-17 公開。公開URLに対しても e2e が成功
 
 ## 確認済みのこと（2026-10-16）
 
