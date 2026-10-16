@@ -672,12 +672,19 @@ window.__game = {
     S.forced = f;
     nextPitch();
   },
+  // 第何球かを変える（撮影用。次の repitch から反映）
+  setIndex: (n: number) => (S.index = n),
   manual: (on: boolean) => (manual = on),
   step: (dt: number, n = 1) => {
     for (let i = 0; i < n; i++) update(dt);
     renderer.render(scene, activeCam);
   },
-  drainEvents: () => S.events.splice(0),
+  // 出来事を { type, args } で返して空にする（例: 'resolve:strike:ball:ng' → { type: 'resolve', args: ['strike', 'ball', 'ng'] }）
+  drainEvents: () =>
+    S.events.splice(0).map((e) => {
+      const [type, ...args] = e.split(':');
+      return { type, args };
+    }),
   posePitcher: (t: number, lefty = false, slot: ArmSlot = 'over') => {
     pitcher.setLefty(lefty);
     pitcher.setSlot(slot);
