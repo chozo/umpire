@@ -6,12 +6,17 @@ export const config = {
   url: 'https://game.chozo.net/umpire/',
   orientation: 'portrait',
   game: { width: 390, height: 693 },
+  // ゲーム画面を大きく置く（上端はアプリの表示と少し重なるが、HUD だけなので許容）。字幕は下部のボタンの上に出す
+  layout: { centerX: 0.47, centerY: 0.42, maxW: 0.86, maxH: 0.84 },
   serveDir: 'dist',
   gamePath: '/umpire/',
   background:
     'radial-gradient(ellipse at 50% 115%, #2f7a3a 0, #1a4a2a 30%, transparent 62%), radial-gradient(circle at 15% 0%, rgba(255,255,255,0.22), transparent 28%), radial-gradient(circle at 85% 0%, rgba(255,255,255,0.16), transparent 26%), linear-gradient(#0f1a2e, #13233d)',
   music: false, // BGM はゲームの応援曲を使う（__game.audio.render が鳴らす）
 };
+
+// 字幕はゲーム画面の下部（ボール・ストライクのボタンの上）に出し、投手やボールに重ねない
+const CAP_Y = 0.7;
 
 const isPhase = (ph) => (s) => s.phase === ph;
 const hideHint = (p) => p.eval((_, win) => { win.document.getElementById('hint').hidden = true; });
@@ -31,7 +36,7 @@ async function pitch(p, { index, force, caption, sub, lead = 0.5, after = 0.7, b
   await hideHint(p);
   // 撮らずに進めた間の音は記録されないので、最初の1球では撮り始める直前に BGM を鳴らし直す
   if (bgm) await p.call('audio.startBgm');
-  if (caption) p.caption(sub ? `${caption}\n${sub}` : caption, { y: 0.17, dur: 1.9, size: 46 });
+  if (caption) p.caption(sub ? `${caption}\n${sub}` : caption, { y: CAP_Y, dur: 1.9, size: 46 });
   await p.until(isPhase('flight'), { max: 3 });
   await p.until((s) => s.flightT >= s.tFront, { max: 2 });
   const s = await p.state();
@@ -51,7 +56,7 @@ export default async function scenario(p) {
 
   // ---- 0〜4秒: ふつうの投球で「ストライーク！」 ----
   await pitch(p, { index: 3, force: { type: 'straight', slot: 'over', lefty: false, category: 'strike', margin: -0.12 }, lead: 0.15, after: 0.9, bgm: true });
-  p.caption('投球を見極めて\nストライク？ボール？\nを判定しよう！', { y: 0.2, dur: 2.3, size: 42 });
+  p.caption('投球を見極めて\nストライク？ボール？\nを判定しよう！', { y: CAP_Y - 0.05, dur: 2.3, size: 42 });
   await p.wait(2.3);
 
   // ---- タイトル ----
@@ -73,12 +78,12 @@ export default async function scenario(p) {
   await p.call('repitch', { type: 'sweeper', slot: 'side', lefty: false, clip: 'front', margin: -0.01 });
   await skipUntil(p, isPhase('windup'));
   await p.skip(0.6);
-  p.caption('多彩な投手を\n見極めろ！', { y: 0.17, dur: 1.9, size: 50 });
+  p.caption('多彩な投手を\n見極めろ！', { y: CAP_Y, dur: 1.9, size: 50 });
   await p.until(isPhase('decide'), { max: 3 });
   await p.call('call', 'ball');
   await p.until(isPhase('replay'), { max: 4 });
   p.shake(8, 0.25);
-  p.caption('際どい球は\nリプレイで検証', { y: 0.17, dur: 1.6, size: 48 });
+  p.caption('際どい球は\nリプレイで検証', { y: CAP_Y, dur: 1.6, size: 48 });
   p.speed(1.8, { badge: false });
   await p.until((s) => s.replaySub === 'top', { max: 6 });
   p.speed(1);
