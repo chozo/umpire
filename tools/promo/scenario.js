@@ -16,95 +16,77 @@ export const config = {
 const isPhase = (ph) => (s) => s.phase === ph;
 const hideHint = (p) => p.eval((_, win) => { win.document.getElementById('hint').hidden = true; });
 
+// 撮らずに進める（条件を満たすまで）
+async function skipUntil(p, cond) {
+  for (let i = 0; i < 300 && !cond(await p.state()); i++) await p.skip(1 / 30);
+}
+
+// 1球投げさせて、正しくコールするところまで撮る。
+// lead: 投球動作のどこから撮るか（windup に入ってからの秒数）。caption は投球動作の途中で出す
+async function pitch(p, { index, force, caption, sub, lead = 0.5, after = 0.7, bgm = false }) {
+  await p.call('setIndex', index);
+  await p.call('repitch', force);
+  await skipUntil(p, isPhase('windup'));
+  await p.skip(lead);
+  await hideHint(p);
+  // 撮らずに進めた間の音は記録されないので、最初の1球では撮り始める直前に BGM を鳴らし直す
+  if (bgm) await p.call('audio.startBgm');
+  if (caption) p.caption(sub ? `${caption}\n${sub}` : caption, { y: 0.17, dur: 1.9, size: 46 });
+  await p.until(isPhase('flight'), { max: 3 });
+  await p.until((s) => s.flightT >= s.tFront, { max: 2 });
+  const s = await p.state();
+  await p.call('call', s.pitch.strike ? 'strike' : 'ball');
+  await p.until(isPhase('called'), { max: 2 });
+  await p.wait(after);
+}
+
 export default async function scenario(p) {
   await p.call('setSeed', 21);
   await p.call('audio.prepare');
 
-  p.on('resolve', (e) => {
-    if (e.args[2] === 'ng') p.shake(10, 0.3);
-  });
-
-  // ---- 0〜3秒: つかみ。サイドスローのスイーパーがベースの前の角をかすめる ----
-  // 描画の準備ができるまで撮らずに進める
+  // 準備（撮らない）。撮影を始めた直後は 3D の画面が白く写るので、実時間で少し待つ
   await p.call('start');
   await p.skip(2);
-  // 撮影を始めた直後は 3D の画面が白く写るので、実時間で少し待ってから撮る
   await p.eval(() => new Promise((r) => setTimeout(r, 3000)));
-  await hideHint(p);
-  await p.call('setIndex', 24);
+
+  // ---- 0〜4秒: ふつうの投球で「ストライーク！」 ----
+  await pitch(p, { index: 3, force: { type: 'straight', slot: 'over', lefty: false, category: 'strike', margin: -0.12 }, lead: 0.15, after: 0.9, bgm: true });
+  p.caption('投球を見極めて\nストライク？ボール？\nを判定しよう！', { y: 0.2, dur: 2.3, size: 42 });
+  await p.wait(2.3);
+
+  // ---- タイトル ----
+  p.title({ title: '球審ジャッジ', sub: 'キミが球審だ！', dur: 2.4 });
+  await p.wait(2.4);
+
+  // ---- 球種の紹介 ----
+  await pitch(p, { index: 6, force: { type: 'curve', slot: 'over', lefty: false, category: 'ball', margin: 0.1, side: 1 }, caption: '多彩な変化球！\nカーブ', sub: null, lead: 0.6 });
+  await pitch(p, { index: 7, force: { type: 'slider', slot: 'over', lefty: false, category: 'strike', margin: -0.08 }, caption: 'スライダー', sub: '鋭く横に滑る', lead: 0.6 });
+  await pitch(p, { index: 8, force: { type: 'shoot', slot: 'over', lefty: false, category: 'ball', margin: 0.1, side: -1 }, caption: 'シュート', sub: '逆方向へ食い込む', lead: 0.6 });
+
+  // ---- 投手の紹介 ----
+  await pitch(p, { index: 12, force: { type: 'slider', slot: 'over', lefty: true, category: 'strike', margin: -0.08 }, caption: '左投手', sub: '左右が逆の変化', lead: 0.2 });
+  await pitch(p, { index: 16, force: { type: 'sweeper', slot: 'side', lefty: false, category: 'ball', margin: 0.1, side: 1 }, caption: 'サイドスロー', sub: '横から斜めに入る', lead: 0.2 });
+  await pitch(p, { index: 22, force: { type: 'sinker', slot: 'under', lefty: false, category: 'strike', margin: -0.08 }, caption: 'アンダースロー', sub: '下から浮き上がる', lead: 0.2 });
+
+  // ---- 際どい球はリプレイで検証 ----
+  await p.call('setIndex', 30);
   await p.call('repitch', { type: 'sweeper', slot: 'side', lefty: false, clip: 'front', margin: -0.01 });
-  await p.skip(0.9);
-  p.caption('ストライク？\nボール？', { y: 0.2, dur: 1.4 });
-  await p.until(isPhase('flight'), { max: 4 });
-  await p.until(isPhase('decide'), { max: 2 });
+  await skipUntil(p, isPhase('windup'));
+  await p.skip(0.6);
+  p.caption('多彩な投手を\n見極めろ！', { y: 0.17, dur: 1.9, size: 50 });
+  await p.until(isPhase('decide'), { max: 3 });
   await p.call('call', 'ball');
   await p.until(isPhase('replay'), { max: 4 });
-  p.speed(1.6, { badge: false });
+  p.shake(8, 0.25);
+  p.caption('際どい球は\nリプレイで検証', { y: 0.17, dur: 1.6, size: 48 });
+  p.speed(1.8, { badge: false });
   await p.until((s) => s.replaySub === 'top', { max: 6 });
   p.speed(1);
   p.flash({ dur: 0.2, strength: 0.6 });
-  p.fx('かすってた！', { x: 0.45, y: 0.3, dur: 1.3, size: 64 });
-  await p.wait(1.25);
-
-  // ---- タイトル ----
-  p.title({ title: '球審ジャッジ', sub: 'ストライクか、ボールか。\nキミの目でコールせよ', dur: 2.6 });
-  await p.call('skip');
-  await p.call('start');
-  await hideHint(p);
-  await p.wait(2.7);
-
-  // ---- 本編: 普通の投球を正しくコール ----
-  await hideHint(p);
-  await p.call('repitch', { type: 'straight', category: 'strike', margin: -0.15 });
-  p.caption('ベースの上を通れば\nストライク', { y: 0.17, dur: 2.0, size: 42 });
-  await p.until(isPhase('flight'), { max: 4 });
-  await p.until((s) => s.flightT >= s.tFront, { max: 2 });
-  await p.until(isPhase('decide'), { max: 2 });
-  await p.wait(0.1);
-  await p.call('call', 'strike');
-  p.caption('早押しでボーナス！', { y: 0.17, dur: 1.6, size: 42 });
-  await p.wait(1.6);
-
-  // ---- 変化球・変則投手 ----
-  await p.call('setIndex', 14);
-  await p.call('repitch', { type: 'curve', slot: 'under', lefty: true, category: 'ball', margin: 0.06 });
-  await p.skip(0.8);
-  p.caption('変化球も\n変則投手も', { y: 0.17, dur: 2.0 });
-  await p.until(isPhase('decide'), { max: 5 });
-  await p.wait(0.1);
-  await p.call('call', 'ball');
-  await p.wait(1.2);
-
-  // ---- 惜しい誤審: ベースの奥をかすめるシュート ----
-  await p.call('setIndex', 31);
-  await p.call('repitch', { type: 'shoot', slot: 'over', lefty: false, clip: 'back', margin: -0.008 });
-  await p.skip(0.9);
-  await p.until(isPhase('flight'), { max: 4 });
-  await p.until(isPhase('decide'), { max: 2 });
-  await p.call('call', 'ball');
-  await p.until((s) => s.phase === 'called', { max: 1 });
-  await p.wait(0.9);
-  p.caption('誤審…！？', { y: 0.2, dur: 1.2, color: '#ff6b6b' });
-  await p.until(isPhase('replay'), { max: 4 });
-  p.caption('リプレイで検証', { y: 0.17, dur: 1.6 });
-  p.speed(1.6, { badge: false });
-  await p.until((s) => s.replaySub === 'top', { max: 6 });
-  p.speed(1);
-  await p.wait(1.6);
-
-  // ---- 球速アップ ----
-  await p.call('skip');
-  await p.call('setIndex', 45);
-  await p.call('repitch', { type: 'slider', slot: 'over', lefty: false, category: 'strike', margin: -0.05 });
-  await p.skip(0.4);
-  p.caption('どんどん速く\n鋭くなる！', { y: 0.17, dur: 2.2 });
-  await p.until(isPhase('decide'), { max: 5 });
-  await p.call('call', 'strike');
-  await p.wait(1.3);
-  p.caption('誤審3回で退場', { y: 0.17, dur: 1.3 });
-  await p.wait(1.3);
+  p.fx('かすってた！', { x: 0.45, y: 0.3, dur: 1.4, size: 64 });
+  await p.wait(1.5);
 
   // ---- エンドカード ----
-  p.endCard({ title: '球審ジャッジ', sub: 'スマホでもPCでも', cta: '今すぐ遊べる！' });
+  p.endCard({ title: '球審ジャッジ', sub: '誤審3回で退場！', cta: '今すぐ遊べる！' });
   await p.wait(3);
 }

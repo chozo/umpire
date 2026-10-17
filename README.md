@@ -86,7 +86,7 @@
 
 ## 告知動画
 
-- `npm run promo` で、ビルドしてから告知動画（縦型 1080×1920・30fps・約31秒）を撮って書き出す。出力はアプリの隣の `../video/`（`umpire-promo.mp4`、表紙 `umpire-promo-cover.jpg`、確認用の一覧 `umpire-promo-sheet.jpg`）。動画はリポジトリに含めない
+- `npm run promo` で、ビルドしてから告知動画（縦型 1080×1920・30fps・約29秒）を撮って書き出す。出力はアプリの隣の `../video/`（`umpire-promo.mp4`、表紙 `umpire-promo-cover.jpg`、確認用の一覧 `umpire-promo-sheet.jpg`）。動画はリポジトリに含めない
 - 台本は `tools/promo/scenario.js`、見た目は `tools/promo/promo.css`。狙った投球は `__game.repitch(...)` と `__game.setIndex(n)` で作る
 - `PROMO_EVERY=15 npm run promo` で15コマおきの一覧画像だけを作って構成を確認できる。`PROMO_ENCODE_ONLY=1 npm run promo` で撮り直さずに書き出しだけやり直す
 - 音はゲームの効果音と応援曲そのもの（`__game.audio.render` で書き出し用に鳴らし直す）。リプレイ中の BGM のスローも同じように入る。音量は -14 LUFS
